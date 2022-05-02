@@ -1,0 +1,86 @@
+/* The following queries were used to sort and filter Global Covid-19 data found 
+   at https://ourworldindata.org/covid-deaths on BigQuery*/ 
+
+SELECT * FROM `my-project-portfolio-123.covid_portfolio.CovidDeaths` 
+ORDER BY location,date
+LIMIT 1000;
+
+/*SELECT * FROM `my-project-portfolio-123.covid_portfolio.CovidVaccinations` 
+ORDER BY location,date
+LIMIT 1000*/
+
+SELECT location,date,total_cases,new_cases,total_deaths,population
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+ORDER BY location,date;
+
+/* Looking at Total cases Vs Total Deaths 
+and likelihood of dying from covid in the United Stated based on date*/
+
+SELECT location,date,total_cases,total_deaths,(total_deaths/total_cases)*100 AS death_percentage
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE location = 'United States'
+ORDER BY location,date;
+
+--Looking at Total Cases vs Population and what percentage of population got Covid
+
+SELECT location,date,population,total_cases, 
+  (total_cases/population)*100 AS percentage_w_covid
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE location = 'United States'
+ORDER BY location,date;
+
+--Looking at Countries w/ highest infection rate vs population
+
+SELECT location,population,MAX(total_cases) AS highest_infection_count, 
+  MAX((total_cases/population))*100 AS percentage_w_covid
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE continent IS NOT NULL
+GROUP BY location, population
+ORDER BY percentage_w_covid DESC;
+
+--Looking at Continents
+WITH continent_count AS (
+  SELECT continent,location,MAX(total_deaths)AS total_death_count
+  FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+  WHERE continent IS NOT NULL
+  GROUP BY location,continent
+)
+SELECT DISTINCT(continent),SUM(total_death_count)OVER(PARTITION BY continent) AS deaths
+FROM continent_count
+ORDER BY deaths DESC;
+
+-- Countries with highest death count per population
+SELECT location, MAX(Total_deaths) AS total_death_count
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE continent IS NOT NULL
+GROUP BY location
+ORDER BY total_death_count DESC;
+
+-- Covid stats globally per day
+SELECT date, SUM(new_cases) AS total_cases_by_day, SUM(new_deaths) AS total_deaths_by_day,
+(SUM(new_deaths)/SUM(new_cases))*100 AS death_percentage
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE continent IS NOT NULL
+GROUP BY date 
+ORDER BY date;
+--Covid count globally total cases vs total deaths vs death percentage
+SELECT  SUM(new_cases) AS total_global_cases, SUM(new_deaths) AS total_global_deaths,
+(SUM(new_deaths)/SUM(new_cases))*100 AS death_percentage
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
+WHERE continent IS NOT NULL;
+
+-- Populations Stats
+WITH population_stats AS
+(
+SELECT cdeaths.continent, cdeaths.location,cdeaths.population,
+       cdeaths.date,cvax.new_vaccinations,
+       MAX(cvax.people_fully_vaccinated) OVER(PARTITION BY cvax.location ORDER BY cvax.location ASC,cvax.date ASC 
+       ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS Fully_Vaxxed,
+FROM my-project-portfolio-123.covid_portfolio.CovidDeaths AS cdeaths
+JOIN my-project-portfolio-123.covid_portfolio.CovidVaccinations AS cvax
+ON cdeaths.location = cvax.location AND cdeaths.date = cvax.date
+WHERE cdeaths.continent IS NOT NULL
+ORDER BY cdeaths.location,cdeaths.date
+)
+SELECT *,(Fully_Vaxxed/population)*100 AS percent_population_fully_vaxxed
+FROM population_stats
