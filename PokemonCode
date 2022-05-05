@@ -1,0 +1,148 @@
+--The following Data Set was gathered from 
+--https://www.kaggle.com/datasets/mariotormo/complete-pokemon-dataset-updated-090420?select=pokedex_%28Update_05.20%29.csv
+--SQL was used through BigQuery to get Data Points
+/* The purpose of this project is to determine the best pokemon against any champion
+we will not consider legendary mythical or mega pokemon since we're an average trainer
+-- First we will rank each pokemon with respect to their type
+-- Since most pokemon evolve into their second type we will only go based on type 1
+-- Meaning Normal and Normal/Fighting will be considered the same types 
+ 
+ --In the Gen 1 game the champion's team (Gary) consists of : 
+    - Pidgeot, Alakazam, Rhydon, Arcanine, Exeggutor, 
+    and (Blastoise, Charizard, Venesaur)
+    so we will start by finding their respecting types */
+
+SELECT Name, type_1, type_2 
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE Name 
+IN ('Pidgeot', 'Alakazam', 'Rhydon', 'Arcanine', 'Exeggutor', 
+     'Blastoise', 'Charizard', 'Venusaur');
+/* we see that their Respecitve types are:
+   - Normal/Flying, Psychic, Ground/Rock, Fire, Grass/Psychic, 
+      Water, Fire/Flying, Grass/Poison
+We run the following codes to determine the best against each type. 
+Since the last three depend on which starter pokemon is selected
+we have omitted the code but still gather an analysis based on the 
+repeated code
+               -note some types were under Alolan and Galarian with 
+                generation as 1 we omitted these type to decrease 
+                confusion since they are from a later Generation
+
+                -Since it is not specific what a 0 rating is, we will
+                omit any 0 values from the results
+*/
+-- vs Normal/Flying (Pidgeot)
+SELECT name,total_points,type_1, against_normal,against_flying
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE against_normal BETWEEN 0.1 AND 0.5 AND against_flying BETWEEN 0.1 and 0.5
+AND generation = 1 
+AND Name NOT LIKE '%Alolan%' AND Name NOT LIKE'%Galarian%' AND Name NOT LIKE '%Mega%'
+ORDER BY against_normal,against_flying,total_points DESC;
+-- MAGNETON
+-- vs Psychic (Alakazam)
+SELECT name,total_points,type_1, against_psychic
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE against_psychic BETWEEN 0.1 AND 0.5
+AND generation = 1 
+AND Name NOT LIKE '%Alolan%' AND Name NOT LIKE'%Galarian%' AND Name NOT LIKE '%Mega%'
+AND Status = 'Normal'
+ORDER BY against_psychic,total_points DESC;
+--STARMIE, Top = Exeggutor, since Gary utilizes one we will go with second pick
+-- vs Ground/Rock (Rhydon)
+SELECT name,total_points,type_1, against_ground, against_rock
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE against_ground BETWEEN 0.1 AND 0.5 AND against_rock <= 1
+AND generation = 1 
+AND Name NOT LIKE '%Alolan%' AND Name NOT LIKE'%Galarian%' AND Name NOT LIKE '%Mega%'
+ORDER BY against_ground,against_rock,total_points DESC;
+--TANGELA, top = Exeggutor, Gary has
+--Fire (Arcanine)
+SELECT name,total_points,type_1, against_fire
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE against_fire BETWEEN 0.1 AND 0.5
+AND generation = 1 
+AND Name NOT LIKE '%Alolan%' AND Name NOT LIKE'%Galarian%' AND Name NOT LIKE '%Mega%'
+ORDER BY against_fire,total_points DESC;
+--DRAGONITE, has highest total points with good against fire stat
+-- vs Grass/Psychic (Exeggutor)
+SELECT name,total_points,type_1, against_grass,against_psychic
+FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+WHERE against_grass BETWEEN 0.1 AND 0.5 AND against_psychic <=1
+AND generation = 1 
+AND Name NOT LIKE '%Alolan%' AND Name NOT LIKE'%Galarian%' AND Name NOT LIKE '%Mega%'
+ORDER BY against_grass,against_psychic,total_points DESC;
+/*SCYTHER, note that Dragonite was top(we had), Charizard was next probability of
+ catching Charmander is fairly low, Scyther was 3rd.
+ vs Water (Blastoise): GYARDOS, his second type gives him a competitive edge
+ vs Fire/Flying(Charizard) GOLEM, Omastar was top, but Omastar,Kabutops and 
+    Aerodactyl are all rare finds (fossils)
+ vs Grass/Poison (Venusaur): GOLBAT 
+ 
+   -- Our Final Team Consists of:
+      Megneton, Starmie, Tangela, Dragonite, Syther
+      and (Gyarados, Golem, Golbat) depending on the starter
+      
+A Similar analysis can be done by simply changing the generation of the champion
+and searching the types of their pokemon using a similar code in line 11*/
+
+/* Suppose now that we are a pokemon researcher and want to find out which is the top
+   pokemon depending on type*/
+
+   WITH rank_by_poke AS(
+    SELECT *, 
+    RANK() OVER(PARTITION BY type_1 ORDER BY total_points DESC) AS rank_by_types
+    FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+    WHERE status = 'Normal' AND name NOT LIKE '%Mega%'
+)
+-- We eliminate any Legendary, sublegendary, and mythical pokemon 
+-- Next we gather the top ranked pokemon based on their type
+-- We use RANK() to rank so that we have can have 10 pokemon in each type
+-- We partition by one type, so normal and normal/fighting are the same type and rank with respect to total_points
+SELECT pokedex_number,name,generation,type_1,total_points,height_m,weight_kg, total_points,hp,rank_by_types
+FROM rank_by_poke 
+WHERE rank_by_types <= 10
+ORDER BY type_1, rank_by_types
+
+/*Since we are only a researcher, our funds are short, we want to know which region (based on generation) is best
+to explore based on number of pokemon they have in the top 10 we can run a similar code using the above CTE*/
+
+--Code to get count of pokemone in top 10 per generation below (CTE is for ranking)
+WITH rank_by_poke_top_10 AS(
+    SELECT *, 
+    RANK() OVER(PARTITION BY type_1 ORDER BY total_points DESC) AS rank_by_types
+    FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+    WHERE status = 'Normal' AND name NOT LIKE '%Mega%'
+   )
+SELECT generation,COUNT(*) AS quality_poke_in_area
+FROM rank_by_poke_top_10
+WHERE rank_by_types <= 10
+GROUP BY generation 
+ORDER BY quality_poke_in_area DESC
+
+--Code to get number 1 ranked in generation X below
+WITH rank_by_poke_top_10 AS(
+    SELECT *, 
+    RANK() OVER(PARTITION BY type_1 ORDER BY total_points DESC) AS rank_by_types
+    FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+    WHERE status = 'Normal' AND name NOT LIKE '%Mega%'
+   )
+SELECT name,type_1,total_points,attack,defense,sp_attack,sp_defense,rank_by_types
+FROM rank_by_poke_top_10 
+WHERE generation = 4 AND rank_by_types <= 1
+
+--
+WITH rank_by_poke_top_10 AS(
+    SELECT *, 
+    RANK() OVER(PARTITION BY type_1 ORDER BY total_points DESC) AS rank_by_types
+    FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+    WHERE status = 'Normal' AND name NOT LIKE '%Mega%'
+   )
+SELECT name,generation,type_1,total_points,attack,defense,sp_attack,sp_defense,rank_by_types
+FROM rank_by_poke_top_10 
+WHERE type_1 = 'Electric'
+ORDER BY rank_by_types
+
+ SELECT name,generation,type_1,total_points,hp,attack,defense,sp_attack,sp_defense,
+    RANK() OVER(PARTITION BY type_1 ORDER BY total_points DESC) AS rank_by_types
+    FROM my-project-portfolio-123.portfolio_v1.pokemon_v2
+    WHERE status = 'Normal' AND name NOT LIKE '%Mega%'
