@@ -1,14 +1,6 @@
 /* The following queries were used to sort and filter Global Covid-19 data found 
    at https://ourworldindata.org/covid-deaths*/ 
 
-SELECT * FROM `my-project-portfolio-123.covid_portfolio.CovidDeaths` 
-ORDER BY location,date
-LIMIT 1000;
-
-/*SELECT * FROM `my-project-portfolio-123.covid_portfolio.CovidVaccinations` 
-ORDER BY location,date
-LIMIT 1000*/
-
 SELECT location,date,total_cases,new_cases,total_deaths,population
 FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
 ORDER BY location,date;
