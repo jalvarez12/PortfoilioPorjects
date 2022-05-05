@@ -1,5 +1,5 @@
 /* The following queries were used to sort and filter Global Covid-19 data found 
-   at https://ourworldindata.org/covid-deaths on BigQuery*/ 
+   at https://ourworldindata.org/covid-deaths*/ 
 
 SELECT * FROM `my-project-portfolio-123.covid_portfolio.CovidDeaths` 
 ORDER BY location,date
@@ -16,10 +16,10 @@ ORDER BY location,date;
 /* Looking at Total cases Vs Total Deaths 
 and likelihood of dying from covid in the United Stated based on date*/
 
-SELECT location,date,total_cases,total_deaths,(total_deaths/total_cases)*100 AS death_percentage
+SELECT continent,location,date,population,total_cases,total_deaths,(total_deaths/total_cases)*100 AS death_percentage
 FROM my-project-portfolio-123.covid_portfolio.CovidDeaths 
-WHERE location = 'United States'
-ORDER BY location,date;
+WHERE continent IS NOT NULL
+ORDER BY continent,location,date;
 
 --Looking at Total Cases vs Population and what percentage of population got Covid
 
@@ -83,4 +83,15 @@ WHERE cdeaths.continent IS NOT NULL
 ORDER BY cdeaths.location,cdeaths.date
 )
 SELECT *,(Fully_Vaxxed/population)*100 AS percent_population_fully_vaxxed
-FROM population_stats
+FROM population_stats;
+
+--Selecting Global numbers, count of vaccinated and percent vaccinated
+
+SELECT  cdeaths.location,cdeaths.population,MAX(cvax.people_fully_vaccinated)AS number_of_people_fully_vaccinated,
+        (MAX(cvax.people_fully_vaccinated)/cdeaths.population)*100 AS percent_population_vaccinated
+FROM my-project-portfolio-123.covid_portfolio.CovidVaccinations AS cvax
+JOIN my-project-portfolio-123.covid_portfolio.CovidDeaths AS cdeaths
+ON cdeaths.location = cvax.location AND cdeaths.date = cvax.date
+WHERE cdeaths.continent IS NULL 
+    AND cdeaths.location IN ('Africa','Asia','North America','South America','Europe','Oceania')
+GROUP BY cdeaths.location,cdeaths.population;
